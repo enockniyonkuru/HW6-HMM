@@ -2,6 +2,27 @@
 
 In this assignment, you'll implement the Forward and Viterbi Algorithms (dynamic programming). 
 
+## Methods
+
+### Forward Algorithm
+The Forward algorithm computes the total probability (likelihood) of an observed sequence given the HMM parameters. It uses a dynamic programming table `alpha[t, j]` representing the probability of observing the first `t` observations and being in hidden state `j` at time `t`.
+
+1. **Initialization**: `alpha[0, j] = prior(j) * emission(j, obs_0)` for each hidden state `j`.
+2. **Recursion**: For each subsequent time step `t`, `alpha[t, j] = sum_i(alpha[t-1, i] * transition(i, j)) * emission(j, obs_t)`.
+3. **Termination**: The total sequence probability is the sum of `alpha` values across all hidden states at the last time step.
+
+### Viterbi Algorithm
+The Viterbi algorithm finds the most likely sequence of hidden states that produced the observed sequence. It is similar to the Forward algorithm but replaces summation with maximization and adds backtracking.
+
+1. **Initialization**: `delta[0, j] = prior(j) * emission(j, obs_0)` for each hidden state `j`.
+2. **Recursion**: For each time step `t`, `delta[t, j] = max_i(delta[t-1, i] * transition(i, j)) * emission(j, obs_t)`. A backpointer table records which previous state `i` achieved the maximum.
+3. **Termination**: The final state is `argmax_j(delta[T-1, j])`.
+4. **Traceback**: Follow backpointers from the final state back to time 0 to recover the best hidden state sequence.
+
+### Edge Cases Handled
+- **Empty observation sequence**: Returns 0.0 (forward) or an empty list (viterbi).
+- **Unknown observation states**: Raises a `ValueError` if any observation is not in the model's vocabulary.
+
 
 # Assignment
 

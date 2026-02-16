@@ -30,9 +30,7 @@ class HiddenMarkovModel:
 
     def forward(self, input_observation_states: np.ndarray) -> float:
         """
-        TODO 
-
-        This function runs the forward algorithm on an input sequence of observation states
+        This function runs the forward algorithm on an input sequence of observation states.
 
         Args:
             input_observation_states (np.ndarray): observation sequence to run forward algorithm on 
@@ -41,21 +39,42 @@ class HiddenMarkovModel:
             forward_probability (float): forward probability (likelihood) for the input observed sequence  
         """        
         
-        # Step 1. Initialize variables
+        # Edge case: empty observation sequence
+        if len(input_observation_states) == 0:
+            return 0.0
         
-       
-        # Step 2. Calculate probabilities
+        # Edge case: observation state not in model
+        for obs in input_observation_states:
+            if obs not in self.observation_states_dict:
+                raise ValueError(f"Observation '{obs}' not found in observation states.")
 
+        num_hidden = len(self.hidden_states)
+        T = len(input_observation_states)
 
-        # Step 3. Return final probability 
-        
+        # Step 1. Initialize forward table (alpha)
+        # alpha[t, j] = P(o_1, ..., o_t, q_t = j | model)
+        alpha = np.zeros((T, num_hidden))
+
+        # Initialize first time step: alpha[0, j] = prior(j) * emission(j, obs_0)
+        first_obs_idx = self.observation_states_dict[input_observation_states[0]]
+        for j in range(num_hidden):
+            alpha[0, j] = self.prior_p[j] * self.emission_p[j, first_obs_idx]
+
+        # Step 2. Recursion: calculate probabilities for t = 1, ..., T-1
+        for t in range(1, T):
+            obs_idx = self.observation_states_dict[input_observation_states[t]]
+            for j in range(num_hidden):
+                # Sum over all previous hidden states
+                alpha[t, j] = np.sum(alpha[t - 1, :] * self.transition_p[:, j]) * self.emission_p[j, obs_idx]
+
+        # Step 3. Return final probability: sum over all states at last time step
+        forward_probability = np.sum(alpha[-1, :])
+        return forward_probability
 
 
     def viterbi(self, decode_observation_states: np.ndarray) -> list:
         """
-        TODO
-
-        This function runs the viterbi algorithm on an input sequence of observation states
+        This function runs the viterbi algorithm on an input sequence of observation states.
 
         Args:
             decode_observation_states (np.ndarray): observation state sequence to decode 
@@ -64,19 +83,47 @@ class HiddenMarkovModel:
             best_hidden_state_sequence(list): most likely list of hidden states that generated the sequence observed states
         """        
         
+        # Edge case: empty observation sequence
+        if len(decode_observation_states) == 0:
+            return []
+
+        # Edge case: observation state not in model
+        for obs in decode_observation_states:
+            if obs not in self.observation_states_dict:
+                raise ValueError(f"Observation '{obs}' not found in observation states.")
+
+        num_hidden = len(self.hidden_states)
+        T = len(decode_observation_states)
+
         # Step 1. Initialize variables
-        
-        #store probabilities of hidden state at each step 
-        viterbi_table = np.zeros((len(decode_observation_states), len(self.hidden_states)))
-        #store best path for traceback
-        best_path = np.zeros(len(decode_observation_states))         
-        
-       
-       # Step 2. Calculate Probabilities
+        # viterbi_table[t, j] = max probability of any path ending in state j at time t
+        viterbi_table = np.zeros((T, num_hidden))
+        # backpointer[t, j] = the state at t-1 that led to the best path ending at state j at time t
+        backpointer = np.zeros((T, num_hidden), dtype=int)
 
-            
-        # Step 3. Traceback 
+        # Initialize first time step
+        first_obs_idx = self.observation_states_dict[decode_observation_states[0]]
+        for j in range(num_hidden):
+            viterbi_table[0, j] = self.prior_p[j] * self.emission_p[j, first_obs_idx]
+            backpointer[0, j] = 0  # no previous state
 
+        # Step 2. Recursion: calculate probabilities for t = 1, ..., T-1
+        for t in range(1, T):
+            obs_idx = self.observation_states_dict[decode_observation_states[t]]
+            for j in range(num_hidden):
+                # Find the max over all previous states
+                trans_probs = viterbi_table[t - 1, :] * self.transition_p[:, j]
+                best_prev = np.argmax(trans_probs)
+                viterbi_table[t, j] = trans_probs[best_prev] * self.emission_p[j, obs_idx]
+                backpointer[t, j] = best_prev
 
-        # Step 4. Return best hidden state sequence 
-        
+        # Step 3. Traceback
+        best_path = np.zeros(T, dtype=int)
+        best_path[T - 1] = np.argmax(viterbi_table[T - 1, :])
+
+        for t in range(T - 2, -1, -1):
+            best_path[t] = backpointer[t + 1, best_path[t + 1]]
+
+        # Step 4. Return best hidden state sequence (convert indices to state names)
+        best_hidden_state_sequence = [self.hidden_states_dict[idx] for idx in best_path]
+        return best_hidden_state_sequence
